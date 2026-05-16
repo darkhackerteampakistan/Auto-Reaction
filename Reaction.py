@@ -10,7 +10,7 @@ from telethon.errors import SessionPasswordNeededError
 # ---------------- CONFIG ----------------
 
 # Fixed storage path (outside download folder)
-BASE_DIR = "/data/data/com.termux/files/home/AUTO_REACTION"
+BASE_DIR = "/storage/emulated/0/AUTO_REACTION"
 
 SESSION_DIR = os.path.join(BASE_DIR, "TG_SESSIONS")
 DB_FILE = os.path.join(BASE_DIR, "accounts.json")
