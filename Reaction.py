@@ -8,10 +8,16 @@ from telethon.tl.types import ReactionEmoji
 from telethon.errors import SessionPasswordNeededError
 
 # ---------------- CONFIG ----------------
-SESSION_DIR = "TG_SESSIONS"
-DB_FILE = "accounts.json"
 
+# Fixed storage path (outside download folder)
+BASE_DIR = "/data/data/com.termux/files/home/AUTO_REACTION"
+
+SESSION_DIR = os.path.join(BASE_DIR, "TG_SESSIONS")
+DB_FILE = os.path.join(BASE_DIR, "accounts.json")
+
+# Auto create folders
 os.makedirs(SESSION_DIR, exist_ok=True)
+os.makedirs(BASE_DIR, exist_ok=True)
 
 clients = []
 accounts = []
@@ -21,9 +27,13 @@ REACTIONS = ["👍", "❤️", "🔥", "😂", "😮"]
 
 # ---------------- DB ----------------
 def load_db():
-    if os.path.exists(DB_FILE):
-        with open(DB_FILE, "r") as f:
-            return json.load(f)
+    try:
+        if os.path.exists(DB_FILE):
+            with open(DB_FILE, "r") as f:
+                return json.load(f)
+    except Exception as e:
+        print("Database load error:", e)
+
     return []
 
 
@@ -34,14 +44,22 @@ def save_db(data):
 
 # ---------------- PARSE LINK ----------------
 def parse_link(link):
-    link = link.replace("https://t.me/", "").replace("http://t.me/", "")
+    link = (
+        link.replace("https://t.me/", "")
+        .replace("http://t.me/", "")
+        .strip("/")
+    )
+
     parts = link.split("/")
     return parts[-2], int(parts[-1])
 
 
 # ---------------- LOGIN ----------------
 async def login_account(i, acc):
-    session_path = os.path.join(SESSION_DIR, acc["session"])
+    session_path = os.path.join(
+        SESSION_DIR,
+        acc["session"]
+    )
 
     client = TelegramClient(
         session_path,
@@ -63,19 +81,32 @@ async def login_account(i, acc):
         print("First login → OTP required")
 
         await client.send_code_request(phone)
-        code = input(f"OTP for ****{masked}: ").strip()
+
+        code = input(
+            f"OTP for ****{masked}: "
+        ).strip()
 
         try:
-            await client.sign_in(phone, code)
+            await client.sign_in(
+                phone,
+                code
+            )
 
         except SessionPasswordNeededError:
-            pwd = input(f"2FA Password for ****{masked}: ").strip()
-            await client.sign_in(password=pwd)
+            pwd = input(
+                f"2FA Password for ****{masked}: "
+            ).strip()
+
+            await client.sign_in(
+                password=pwd
+            )
 
         print("Login success → session saved")
 
     else:
-        print("Session found → auto login (NO OTP)")
+        print(
+            "Session found → auto login (NO OTP)"
+        )
 
     return client
 
@@ -88,22 +119,35 @@ async def load_all():
 
     if not accounts:
         print("No accounts found")
+        print(
+            f"Storage path: {BASE_DIR}"
+        )
         return
 
-    print(f"\nLoading {len(accounts)} accounts...\n")
+    print(
+        f"\nLoading {len(accounts)} accounts...\n"
+    )
 
     for i, acc in enumerate(accounts, 1):
 
         if not acc.get("active", True):
-            print(f"Skipping inactive account {i}")
+            print(
+                f"Skipping inactive account {i}"
+            )
             continue
 
         try:
-            client = await login_account(i, acc)
+            client = await login_account(
+                i,
+                acc
+            )
             clients.append(client)
 
         except Exception as e:
-            print(f"Account {i} failed:", e)
+            print(
+                f"Account {i} failed:",
+                e
+            )
 
 
 # ---------------- ADD ACCOUNT ----------------
@@ -111,17 +155,33 @@ async def add_account():
     print("\n=== ADD ACCOUNT ===")
 
     acc = {
-        "session": f"acc{len(accounts)+1}",
-        "api_id": int(input("API ID: ")),
-        "api_hash": input("API HASH: ").strip(),
-        "phone": input("PHONE: ").strip(),
+        "session":
+        f"acc{len(accounts)+1}",
+
+        "api_id":
+        int(input("API ID: ")),
+
+        "api_hash":
+        input(
+            "API HASH: "
+        ).strip(),
+
+        "phone":
+        input(
+            "PHONE: "
+        ).strip(),
+
         "active": True
     }
 
     accounts.append(acc)
     save_db(accounts)
 
-    client = await login_account(len(accounts), acc)
+    client = await login_account(
+        len(accounts),
+        acc
+    )
+
     clients.append(client)
 
 
@@ -134,8 +194,20 @@ def show_accounts():
         return
 
     for i, acc in enumerate(accounts, 1):
-        status = "ACTIVE" if acc.get("active", True) else "INACTIVE"
-        print(f"[{i}] {status} | {acc['phone']} | {acc['session']}")
+        status = (
+            "ACTIVE"
+            if acc.get(
+                "active",
+                True
+            )
+            else "INACTIVE"
+        )
+
+        print(
+            f"[{i}] {status} | "
+            f"{acc['phone']} | "
+            f"{acc['session']}"
+        )
 
 
 # ---------------- LOGOUT (SOFT) ----------------
@@ -143,12 +215,26 @@ def logout_account():
     show_accounts()
 
     try:
-        idx = int(input("\nEnter serial to logout: ")) - 1
+        idx = (
+            int(
+                input(
+                    "\nEnter serial to logout: "
+                )
+            ) - 1
+        )
 
         if 0 <= idx < len(accounts):
-            accounts[idx]["active"] = False
+            accounts[idx][
+                "active"
+            ] = False
+
             save_db(accounts)
-            print("✔ Logged out (session kept, no OTP needed later)")
+
+            print(
+                "✔ Logged out "
+                "(session kept, "
+                "no OTP needed later)"
+            )
 
         else:
             print("Invalid selection")
@@ -162,12 +248,25 @@ def enable_account():
     show_accounts()
 
     try:
-        idx = int(input("\nEnter serial to enable: ")) - 1
+        idx = (
+            int(
+                input(
+                    "\nEnter serial to enable: "
+                )
+            ) - 1
+        )
 
         if 0 <= idx < len(accounts):
-            accounts[idx]["active"] = True
+            accounts[idx][
+                "active"
+            ] = True
+
             save_db(accounts)
-            print("✔ Account enabled (auto login next time)")
+
+            print(
+                "✔ Account enabled "
+                "(auto login next time)"
+            )
 
         else:
             print("Invalid selection")
@@ -177,16 +276,32 @@ def enable_account():
 
 
 # ---------------- REACTION ----------------
-async def send_reaction(client, chat, msg_id):
-    emoji = random.choice(REACTIONS)
+async def send_reaction(
+    client,
+    chat,
+    msg_id
+):
+    emoji = random.choice(
+        REACTIONS
+    )
 
     try:
-        await client(functions.messages.SendReactionRequest(
-            peer=chat,
-            msg_id=msg_id,
-            reaction=[ReactionEmoji(emoticon=emoji)]
-        ))
-        print("Reaction sent:", emoji)
+        await client(
+            functions.messages.SendReactionRequest(
+                peer=chat,
+                msg_id=msg_id,
+                reaction=[
+                    ReactionEmoji(
+                        emoticon=emoji
+                    )
+                ]
+            )
+        )
+
+        print(
+            "Reaction sent:",
+            emoji
+        )
 
     except Exception as e:
         print("Failed:", e)
@@ -196,21 +311,39 @@ async def send_reaction(client, chat, msg_id):
 async def react_all(link):
     chat, msg_id = parse_link(link)
 
-    print("\n=== SENDING REACTIONS ===")
+    print(
+        "\n=== SENDING REACTIONS ==="
+    )
 
-    for i, client in enumerate(clients, 1):
+    for i, client in enumerate(
+        clients,
+        1
+    ):
         try:
-            if not client.is_connected():
-                await client.connect()
+            await client.connect()
 
-            print(f"ACCOUNT {i}")
+            print(
+                f"ACCOUNT {i}"
+            )
 
-            await send_reaction(client, chat, msg_id)
+            await send_reaction(
+                client,
+                chat,
+                msg_id
+            )
 
-            await asyncio.sleep(random.randint(3, 6))
+            await asyncio.sleep(
+                random.randint(
+                    3,
+                    6
+                )
+            )
 
         except Exception as e:
-            print(f"Account {i} skipped:", e)
+            print(
+                f"Account {i} skipped:",
+                e
+            )
 
 
 # ---------------- MAIN MENU ----------------
@@ -229,7 +362,9 @@ async def main():
 ====================
 """)
 
-        choice = input("Choose: ").strip()
+        choice = input(
+            "Choose: "
+        ).strip()
 
         if choice == "1":
             await add_account()
@@ -244,8 +379,13 @@ async def main():
             enable_account()
 
         elif choice == "5":
-            link = input("Post link: ").strip()
-            await react_all(link)
+            link = input(
+                "Post link: "
+            ).strip()
+
+            await react_all(
+                link
+            )
 
         else:
             break
